@@ -1,57 +1,13 @@
 from flask import Flask, request, jsonify
-from PIL import Image
-import requests
-from io import BytesIO
-import numpy as np
+import google.generativeai as genai
+import json
 
 app = Flask(__name__)
 
-def get_dominant_color(image_url):
+# GEMINI API KEY
+genai.configure(api_key="AIzaSyBeK-XrNL8gkpDxbRyVczonSqf8gv2UnsI")
 
-    response = requests.get(image_url)
-    img = Image.open(BytesIO(response.content)).convert("RGB")
-    img = img.resize((80,80))
-
-    pixels = np.array(img).reshape(-1,3)
-
-    avg = pixels.mean(axis=0)
-
-    r,g,b = int(avg[0]),int(avg[1]),int(avg[2])
-
-    return "#{:02x}{:02x}{:02x}".format(r,g,b), (r,g,b)
-
-def detect_brightness(rgb):
-
-    r,g,b = rgb
-
-    brightness = (r+g+b)/3
-
-    if brightness < 120:
-        return "dark"
-    return "light"
-
-def detect_pattern(image):
-
-    gray = image.convert("L")
-    arr = np.array(gray)
-
-    variance = arr.var()
-
-    if variance > 900:
-        return "patterned"
-    return "solid"
-
-def detect_style(color_rgb):
-
-    r,g,b = color_rgb
-
-    if r < 80 and g < 80 and b < 80:
-        return "luxury"
-
-    if r > 180 and g > 180:
-        return "casual"
-
-    return "modern"
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
@@ -59,31 +15,74 @@ def analyze():
     data = request.json
     image_url = data.get("image")
 
-    response = requests.get(image_url)
-    img = Image.open(BytesIO(response.content)).convert("RGB")
+    prompt = f"""
+Analyze this clothing product image.
 
-    dominant_hex, rgb = get_dominant_color(image_url)
+Return ONLY JSON.
 
-    brightness = detect_brightness(rgb)
-    pattern = detect_pattern(img)
-    style = detect_style(rgb)
+Fields required:
+dominant_color
+pattern
+fabric
+style
+luxury_level
+occasion
 
+Example JSON:
+{{
+"dominant_color":"#000000",
+"pattern":"floral",
+"fabric":"chiffon",
+"style":"luxury",
+"luxury_level":"high",
+"occasion":"eveningwear"
+}}
+"""
+
+    response = model.generate_content([
+        prompt,
+        image_url
+    ])
+
+    text = response.text
+
+    try:
+        ai_data = json.loads(text)
+    except:
+        ai_data = {
+            "dominant_color":"#000000",
+            "pattern":"solid",
+            "fabric":"unknown",
+            "style":"modern",
+            "luxury_level":"medium",
+            "occasion":"casual"
+        }
+
+    # THEME ENGINE RULES
+
+    primary_color = ai_data["dominant_color"]
     font_color = "#000000"
+    background = "#ffffff"
 
-    if brightness == "dark":
+    if ai_data["style"] == "luxury":
         font_color = "#ffffff"
 
-    theme = {
-        "primary_color": dominant_hex,
-        "accent": dominant_hex,
-        "background": "#ffffff",
+    if ai_data["pattern"] == "floral":
+        background = "#FCEFF5"
+
+    result = {
+        "primary_color": primary_color,
+        "accent": primary_color,
+        "background": background,
         "font_color": font_color,
-        "pattern": pattern,
-        "style": style
+        "pattern": ai_data["pattern"],
+        "style": ai_data["style"],
+        "fabric": ai_data["fabric"]
     }
 
-    return jsonify(theme)
+    return jsonify(result)
+
 
 @app.route("/")
 def home():
-    return "AI Fashion Theme Engine Running"
+    return "AI Fashion Engine Running"

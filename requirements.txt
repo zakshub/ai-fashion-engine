@@ -1,5 +1,6 @@
 flask
 gunicorn
-pillow
+google-generativeai
 requests
+pillow
 numpy
