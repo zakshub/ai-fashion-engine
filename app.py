@@ -27,13 +27,27 @@ def analyze():
     data = request.json
     image_url = data.get("image")
 
-    color = get_dominant_color(image_url)
+    dominant_color = get_dominant_color(image_url)
+
+    brightness = "light"
+
+    r = int(dominant_color[1:3],16)
+    g = int(dominant_color[3:5],16)
+    b = int(dominant_color[5:7],16)
+
+    if (r+g+b)/3 < 120:
+        brightness = "dark"
+
+    font_color = "#000000"
+
+    if brightness == "dark":
+        font_color = "#ffffff"
 
     result = {
-        "primary_color": color,
+        "primary_color": dominant_color,
         "background": "#ffffff",
-        "font_color": "#000000",
-        "accent": color
+        "font_color": font_color,
+        "accent": dominant_color
     }
 
     return jsonify(result)
