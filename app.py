@@ -21,3 +21,7 @@ def analyze():
     }
 
     return jsonify(result)
+
+@app.route("/")
+def home():
+    return "AI Fashion Theme Engine Running"
